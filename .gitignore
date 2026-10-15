@@ -11,6 +11,9 @@ node_modules/
 frontend/dist/
 dist/
 
+# Vercel
+.vercel/
+
 # Logs
 logs/
 *.log

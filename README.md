@@ -261,3 +261,71 @@ To use persistent data, pick one of:
 - **Run MongoDB in Docker:** `docker run -d -p 27017:27017 --name quizcraft-mongo mongo`
 - **Use MongoDB Atlas** and paste your connection string into `MONGO_URI` in
   `backend/.env`.
+
+---
+
+## ☁️ Deploying to Vercel
+
+This project is pre-configured for **Vercel** (frontend + backend in one deployment).
+
+### How it works
+
+- `vercel.json` — rewrites `/api/*` to the serverless function and SPA fallback
+  for all other routes.
+- `api/index.js` — the serverless entry point. It lazily connects to MongoDB
+  (cached across warm invocations) and mounts the existing Express app.
+- Root `package.json` — installs backend deps for the serverless function and
+  builds the frontend into `frontend/dist`.
+
+### 1. Push to GitHub (already done)
+
+```bash
+git add .
+git commit -m "prepare for Vercel"
+git push -u origin main
+```
+
+### 2. Import on Vercel
+
+1. Go to [vercel.com/new](https://vercel.com/new) and **Import** your GitHub repo
+   (`malikessa699-collab/Quiz-App`).
+2. Vercel auto-detects Vite. Confirm:
+   - **Build Command:** `npm run build`
+   - **Output Directory:** `frontend/dist`
+3. Click **Deploy**.
+
+### 3. Add environment variables
+
+In the Vercel project → **Settings → Environment Variables**, add for
+**Production** (and Preview/Development as needed):
+
+| Name                | Example                                                          |
+|---------------------|------------------------------------------------------------------|
+| `MONGO_URI`         | `mongodb+srv://user:pass@cluster.mongodb.net/quizcraft`         |
+| `JWT_SECRET`        | `a_long_random_secret_string`                                    |
+| `JWT_EXPIRES_IN`    | `7d`                                                             |
+| `AI_PROVIDER`       | `openai` / `gemini` (or leave blank for built-in fallback)      |
+| `OPENAI_API_KEY`    | `sk-...` (only if using OpenAI)                                  |
+| `GEMINI_API_KEY`    | `...` (only if using Gemini)                                     |
+| `ADMIN_NAME`        | `Administrator`                                                  |
+| `ADMIN_EMAIL`       | `admin@quizcraft.app`                                            |
+| `ADMIN_PASSWORD`    | `YourAdminPassword`                                              |
+| `VITE_API_URL`      | *(optional)* Set to your deployed URL if you use an absolute API path |
+
+Then redeploy (Vercel redeploys automatically when env vars change).
+
+> ⚠️ **Never** put secrets in the frontend bundle. `MONGO_URI`, `JWT_SECRET`, and
+> API keys only belong in Vercel's environment variables (backend/serverless scope),
+> never in `VITE_*` variables (which are exposed to the browser).
+
+### 4. Verify
+
+- Your app is live at `https://<your-project>.vercel.app`
+- Backend health check: `https://<your-project>.vercel.app/api/health`
+  → expect `{"success":true,"status":"ok",...}`
+- Register a user — data persists in MongoDB Atlas.
+
+### Local dev still works
+
+- `cd backend && npm run dev` → API on `http://localhost:5000`
+- `cd frontend && npm run dev` → UI on `http://localhost:5173` (proxies `/api` to 5000)
