@@ -296,6 +296,13 @@ git push -u origin main
 
 ### 3. Add environment variables
 
+> ⚠️ **`MONGO_URI` is REQUIRED on Vercel.** Unlike local development, the
+> in-memory MongoDB fallback is **disabled** in serverless, so a missing or
+> local-only value (e.g. `mongodb://127.0.0.1:27017/quizcraft`) causes every
+> `/api` request to fail with `Database connection failed`. Use a hosted
+> MongoDB (MongoDB Atlas is free on the M0 tier) and paste its connection
+> string here.
+
 In the Vercel project → **Settings → Environment Variables**, add for
 **Production** (and Preview/Development as needed):
 

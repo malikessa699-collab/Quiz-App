@@ -9,6 +9,12 @@
  * MongoDB connection: serverless functions can be cold-started and run in
  * many instances, so we lazily connect on first request and reuse the
  * cached connection promise for subsequent invocations on the same instance.
+ *
+ * IMPORTANT: On Vercel you MUST set the MONGO_URI environment variable to a
+ * reachable, hosted MongoDB (e.g. MongoDB Atlas). A local connection string
+ * like `mongodb://127.0.0.1:27017/quizcraft` cannot be reached from the
+ * cloud, and the in-memory fallback is intentionally disabled in serverless
+ * so a misconfiguration surfaces as a clear error instead of a mystery.
  */
 const express = require('express');
 const mongoose = require('mongoose');
@@ -18,7 +24,30 @@ const app = require('../backend/src/server');
 // Cache the connection promise across warm invocations.
 let connectionPromise = null;
 
+function isConfigured() {
+  // The default local string is not usable on Vercel, so treat it as unset.
+  return Boolean(
+    config.mongoURI &&
+      config.mongoURI !== 'mongodb://127.0.0.1:27017/quizcraft'
+  );
+}
+
 function getDbConnection() {
+  if (!isConfigured()) {
+    return Promise.reject(
+      new Error(
+        'MONGO_URI is not set or points to a local MongoDB. Add a hosted ' +
+          'MongoDB connection string (e.g. MongoDB Atlas) to the MONGO_URI ' +
+          'environment variable in Vercel and redeploy.'
+      )
+    );
+  }
+
+  // If we are already connected (e.g. warm instance), reuse the connection.
+  if (mongoose.connection.readyState === 1) {
+    return Promise.resolve(mongoose.connection);
+  }
+
   if (!connectionPromise) {
     connectionPromise = mongoose
       .connect(config.mongoURI, {
@@ -26,7 +55,9 @@ function getDbConnection() {
         maxPoolSize: 1,
       })
       .then(() => {
-        console.log(`[Vercel] Connected to MongoDB at ${config.mongoURI.split('@').pop()}`);
+        console.log(
+          `[Vercel] Connected to MongoDB at ${config.mongoURI.split('@').pop()}`
+        );
         return mongoose.connection;
       })
       .catch((err) => {
@@ -51,7 +82,8 @@ handler.use('/api', async (req, res, next) => {
     res.status(500).json({
       success: false,
       status: 'error',
-      message: 'Database connection failed. Please try again later.',
+      message:
+        err.message || 'Database connection failed. Please try again later.',
     });
   }
 });
